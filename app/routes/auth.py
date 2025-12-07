@@ -1,30 +1,40 @@
 from fastapi import APIRouter, HTTPException, status, Depends
 from fastapi.security import OAuth2PasswordRequestForm
 from datetime import timedelta, datetime
+from pydantic import BaseModel
 from bson import ObjectId
+
 from app.database import users_collection
-from app.schemas.user import UserCreate, UserResponse, UserLogin, Token
+from app.models.user import UserCreate, UserResponse, Token
 from app.utils.auth import (
     verify_password, 
     get_password_hash, 
     create_access_token,
-    get_current_user,
     get_current_active_user
 )
 from app.config import settings
 
 router = APIRouter(prefix="/auth", tags=["Autenticação"])
 
+
+class UpdateProfileRequest(BaseModel):
+    full_name: str
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str
+
 @router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 async def register(user: UserCreate):
     """Registra um novo usuário"""
-    
+
     if users_collection.find_one({"email": user.email.lower()}):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Este email já está cadastrado"
         )
-    
+
     user_dict = {
         "email": user.email.lower(),
         "full_name": user.full_name,
@@ -34,10 +44,10 @@ async def register(user: UserCreate):
         "created_at": datetime.utcnow(),
         "updated_at": datetime.utcnow()
     }
-    
+
     result = users_collection.insert_one(user_dict)
     created_user = users_collection.find_one({"_id": result.inserted_id})
-    
+
     return {
         "id": str(created_user["_id"]),
         "email": created_user["email"],
@@ -50,33 +60,33 @@ async def register(user: UserCreate):
 @router.post("/login", response_model=Token)
 async def login(form_data: OAuth2PasswordRequestForm = Depends()):
     """Faz login e retorna token JWT"""
-    
+
     user = users_collection.find_one({"email": form_data.username.lower()})
-    
+
     if not user or not verify_password(form_data.password, user["hashed_password"]):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Email ou senha incorretos",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    
+
     if not user.get("is_active", True):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Usuário inativo. Entre em contato com o suporte."
         )
-    
+
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
         data={"sub": user["email"]},
         expires_delta=access_token_expires
     )
-    
+
     users_collection.update_one(
         {"_id": user["_id"]},
         {"$set": {"last_login": datetime.utcnow()}}
     )
-    
+
     return {
         "access_token": access_token,
         "token_type": "bearer",
@@ -93,6 +103,7 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
 @router.get("/me", response_model=UserResponse)
 async def get_me(current_user: dict = Depends(get_current_active_user)):
     """Retorna dados do usuário logado"""
+
     return {
         "id": str(current_user["_id"]),
         "email": current_user["email"],
@@ -104,23 +115,23 @@ async def get_me(current_user: dict = Depends(get_current_active_user)):
 
 @router.put("/me", response_model=UserResponse)
 async def update_me(
-    full_name: str,
+    data: UpdateProfileRequest,
     current_user: dict = Depends(get_current_active_user)
 ):
-    """Atualiza dados do usuário logado"""
-    
+    """Atualiza os dados do usuário"""
+
     users_collection.update_one(
         {"_id": current_user["_id"]},
         {
             "$set": {
-                "full_name": full_name,
+                "full_name": data.full_name,
                 "updated_at": datetime.utcnow()
             }
         }
     )
-    
+
     updated_user = users_collection.find_one({"_id": current_user["_id"]})
-    
+
     return {
         "id": str(updated_user["_id"]),
         "email": updated_user["email"],
@@ -132,26 +143,25 @@ async def update_me(
 
 @router.post("/change-password")
 async def change_password(
-    current_password: str,
-    new_password: str,
+    data: ChangePasswordRequest,
     current_user: dict = Depends(get_current_active_user)
 ):
     """Altera a senha do usuário"""
-    
-    if not verify_password(current_password, current_user["hashed_password"]):
+
+    if not verify_password(data.current_password, current_user["hashed_password"]):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Senha atual incorreta"
         )
-    
+
     users_collection.update_one(
         {"_id": current_user["_id"]},
         {
             "$set": {
-                "hashed_password": get_password_hash(new_password),
+                "hashed_password": get_password_hash(data.new_password),
                 "updated_at": datetime.utcnow()
             }
         }
     )
-    
+
     return {"message": "Senha alterada com sucesso"}

@@ -3,7 +3,7 @@ from typing import List, Optional
 from datetime import datetime
 from bson import ObjectId
 from app.database import products_collection
-from app.schemas.product import (
+from app.models.product import (
     ProductCreate, 
     ProductUpdate, 
     ProductResponse, 

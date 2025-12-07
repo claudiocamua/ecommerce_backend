@@ -1,9 +1,10 @@
 from fastapi import APIRouter, HTTPException, status, Depends, Query
 from typing import List, Optional
+from pymongo import ReturnDocument
 from datetime import datetime, timedelta
 from bson import ObjectId
-from app.database import products_collection, db
-from app.schemas.order import (
+from app.database import products_collection, orders_collection, carts_collection, get_db
+from app.models.order import (
     CreateOrderRequest,
     OrderResponse,
     UpdateOrderStatusRequest,
@@ -15,21 +16,20 @@ from app.utils.auth import get_current_active_user
 
 router = APIRouter(prefix="/orders", tags=["Pedidos"])
 
-orders_collection = db["orders"]
-carts_collection = db["carts"]
-counters_collection = db["counters"]
+def get_counters_collection():
+    """Retorna a collection de contadores"""
+    return get_db()["counters"]
 
 def generate_order_number() -> str:
     """Gera número único do pedido"""
     today = datetime.utcnow().strftime("%Y%m%d")
     
-    # Incrementa contador do dia
-    counter = counters_collection.find_one_and_update(
-        {"_id": f"order_{today}"},
-        {"$inc": {"sequence": 1}},
-        upsert=True,
-        return_document=True
-    )
+    counter = get_counters_collection().find_one_and_update(
+    {"_id": f"order_{today}"},
+    {"$inc": {"sequence": 1}},
+    upsert=True,
+    return_document=ReturnDocument.AFTER
+)
     
     sequence = counter.get("sequence", 1)
     return f"PED-{today}-{sequence:04d}"
