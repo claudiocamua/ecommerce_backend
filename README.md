@@ -45,6 +45,5 @@ pytest -v
 
 ### 1. Clonar o repositório
 ```bash
-git clone https://github.com/seu-usuario/seu-repositorio.git
+git clone git@github.com:claudiocamua/ecommerce_backend.git
 cd seu-repositorio
-# ecommerce_backend
