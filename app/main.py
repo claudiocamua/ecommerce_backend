@@ -1,19 +1,19 @@
+import os
+from datetime import datetime
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from datetime import datetime
-from app.database import test_connection, init_collections
-from app.routes import auth, products, cart, orders
-from app.config import settings
-from app.routes import uploads
-import os
 
-os.makedirs("uploads", exist_ok=True)
+from app.config import settings
+from app.database import test_connection, init_collections
+from app.routes import auth, products, cart, orders, uploads, payments
+
+os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
 
 app = FastAPI(
-    title="E-commerce API",
+    title=settings.APP_NAME,
     description="API completa para e-commerce com autenticação, produtos, carrinho e pedidos",
-    version="4.0.0",
+    version=settings.VERSION,
     docs_url="/docs" if os.getenv("ENVIRONMENT") != "production" else None,
     redoc_url="/redoc" if os.getenv("ENVIRONMENT") != "production" else None,
 )
@@ -26,28 +26,30 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-if os.path.exists("uploads"):
-    app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+app.mount(f"/{settings.UPLOAD_DIR}", StaticFiles(directory=settings.UPLOAD_DIR), name="uploads")
+
 
 @app.on_event("startup")
 async def startup_event():
     print(f"\n{'='*60}")
     print(f"Iniciando aplicação - Ambiente: {os.getenv('ENVIRONMENT', 'development')}")
     print(f"{'='*60}\n")
-    
+
     test_connection()
     init_collections()
-    
+
     print(f"\n{'='*60}")
     print("API inicializada com sucesso!")
     print("Documentação: /docs (somente em desenvolvimento)")
     print(f"{'='*60}\n")
 
+
 @app.on_event("shutdown")
 async def shutdown_event():
     print("\nEncerrando aplicação...")
 
-@app.get("/health")
+
+@app.get("/health", tags=["health"])
 async def health_check():
     return {
         "status": "healthy",
@@ -55,26 +57,27 @@ async def health_check():
         "timestamp": datetime.now().isoformat()
     }
 
-app.include_router(auth.router)
-app.include_router(products.router)
-app.include_router(cart.router)
-app.include_router(orders.router)
-app.include_router(uploads.router)
+app.include_router(auth.router, prefix="/auth", tags=["auth"])
+app.include_router(products.router, prefix="/products", tags=["products"])
+app.include_router(cart.router, prefix="/cart", tags=["cart"])
+app.include_router(orders.router, prefix="/orders", tags=["orders"])
+app.include_router(uploads.router, prefix=f"/{settings.UPLOAD_DIR}", tags=["uploads"])
+app.include_router(payments.router, prefix="/payments", tags=["payments"])
 
-@app.get("/")
+
+@app.get("/", tags=["root"])
 async def root():
     return {
         "message": "E-commerce API Completa",
-        "version": "4.0.0",
+        "version": settings.VERSION,
         "environment": os.getenv("ENVIRONMENT", "development"),
         "endpoints": {
             "health": "/health",
             "auth": "/auth",
             "products": "/products",
             "cart": "/cart",
-            "orders": "/orders"
+            "orders": "/orders",
+            "uploads": f"/{settings.UPLOAD_DIR}",
+            "payments": "/payments"
         }
     }
-from app.routes import payments
-app.include_router(payments.router)
-

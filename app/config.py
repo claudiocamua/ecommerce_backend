@@ -10,10 +10,7 @@ class Settings:
     VERSION = "4.0.0"
     
     ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
-
     DEMO_MODE = os.getenv("DEMO_MODE", "false").lower() == "true"
-
-    
     DEBUG = ENVIRONMENT != "production"
 
     MONGODB_URI = os.getenv("MONGODB_URI")
@@ -29,7 +26,7 @@ class Settings:
     MAX_UPLOAD_SIZE = int(os.getenv("MAX_UPLOAD_SIZE", 5242880))
 
     def get_allowed_origins(self):
-        """Retorna lista dividida por vírgulas"""
+        """Retorna lista de URLs separadas por vírgula"""
         return [origin.strip() for origin in self.ALLOWED_ORIGINS.split(",")]
 
 settings = Settings()
