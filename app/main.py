@@ -57,12 +57,13 @@ async def health_check():
         "timestamp": datetime.now().isoformat()
     }
 
-app.include_router(auth.router, prefix="/auth", tags=["auth"])
-app.include_router(products.router, prefix="/products", tags=["products"])
-app.include_router(cart.router, prefix="/cart", tags=["cart"])
-app.include_router(orders.router, prefix="/orders", tags=["orders"])
-app.include_router(uploads.router, prefix=f"/{settings.UPLOAD_DIR}", tags=["uploads"])
-app.include_router(payments.router, prefix="/payments", tags=["payments"])
+
+app.include_router(auth.router)
+app.include_router(products.router)
+app.include_router(cart.router)
+app.include_router(orders.router)
+app.include_router(uploads.router)
+app.include_router(payments.router)
 
 
 @app.get("/", tags=["root"])
