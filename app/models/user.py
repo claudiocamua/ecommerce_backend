@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, field_validator, model_validator
 from typing import Optional
 from datetime import datetime
 import re
@@ -9,12 +9,17 @@ class UserBase(BaseModel):
 
 
 class UserCreate(UserBase):
-    password: str = Field(..., min_length=8)
-    password_confirm: str
+    password: str = Field(..., min_length=8, max_length=72)
+    password_confirm: str = Field(..., min_length=8, max_length=72)
 
+    @field_validator('password')
     @classmethod
     def validate_password(cls, v: str) -> str:
         """Regras fortes de senha"""
+        # Verificar tamanho em bytes (limite do bcrypt)
+        if len(v.encode('utf-8')) > 72:
+            raise ValueError("Senha não pode ter mais de 72 caracteres")
+        
         if len(v) < 8:
             raise ValueError("Senha deve ter no mínimo 8 caracteres")
         if not re.search(r"[A-Z]", v):
@@ -27,11 +32,11 @@ class UserCreate(UserBase):
             raise ValueError("Senha deve conter pelo menos 1 caractere especial")
         return v
 
-    @classmethod
-    def passwords_match(cls, v, values):
-        if "password" in values and v != values["password"]:
+    @model_validator(mode='after')
+    def passwords_match(self):
+        if self.password != self.password_confirm:
             raise ValueError("As senhas não conferem")
-        return v
+        return self
 
 class UserLogin(BaseModel):
     email: EmailStr

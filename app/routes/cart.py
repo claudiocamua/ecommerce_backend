@@ -15,8 +15,9 @@ from app.utils.auth import get_current_active_user
 router = APIRouter(prefix="/cart", tags=["Carrinho"])
 
 def calculate_cart_total(items: List[dict]) -> tuple[int, float]:
+    """Calcula total de itens e valor total do carrinho"""
     total_items = sum(item["quantity"] for item in items)
-    subtotal = sum(item["subtotal"] for item in items)
+    subtotal = sum(item["total_price"] for item in items)  # ← Mudança aqui: de "subtotal" para "total_price"
     return total_items, round(subtotal, 2)
 
 def get_product_details(product_id: str) -> dict:
@@ -37,24 +38,39 @@ def get_product_details(product_id: str) -> dict:
     return product
 
 
-def format_cart_items(cart_items: List[dict]) -> List[CartItemResponse]:
+def format_cart_items(items: List[dict]) -> List[dict]:
+    """Formata os itens do carrinho com informações do produto"""
     formatted_items = []
-
-    for item in cart_items:
-        product = get_product_details(item["product_id"])
-        subtotal = round(item["quantity"] * product["price"], 2)
-
+    
+    for item in items:
+        product = products_collection.find_one({"_id": ObjectId(item["product_id"])})
+        
+        if not product:
+            continue
+        
+        # Tratamento seguro para imagens
+        image_urls = product.get("image_urls", [])
+        product_image = image_urls[0] if image_urls and len(image_urls) > 0 else None
+        
+        # Calcular valores
+        unit_price = product["price"]
+        quantity = item["quantity"]
+        subtotal = round(unit_price * quantity, 2)
+        stock = product.get("stock", 0)
+        
         formatted_items.append({
-            "product_id": item["product_id"],
+            "product_id": str(product["_id"]),
             "product_name": product["name"],
-            "product_price": product["price"],
-            "product_image": product.get("image_urls", [None])[0],
-            "quantity": item["quantity"],
-            "subtotal": subtotal,
-            "in_stock": product["stock"] > 0,
-            "available_stock": product["stock"]
+            "product_image": product_image,
+            "product_price": unit_price,  # Campo que estava faltando
+            "quantity": quantity,
+            "unit_price": unit_price,
+            "subtotal": subtotal,  # Campo que estava faltando
+            "total_price": subtotal,
+            "in_stock": stock >= quantity,  # Campo que estava faltando
+            "available_stock": stock  # Campo que estava faltando
         })
-
+    
     return formatted_items
 
 @router.post("/add", response_model=CartResponse)
@@ -171,7 +187,7 @@ async def update_cart_item(
                 "updated_at": datetime.utcnow()
             }
         }
-    )
+    )  # ← Este parêntese fecha o update_one
 
     if result.matched_count == 0:
         raise HTTPException(

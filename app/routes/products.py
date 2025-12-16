@@ -20,7 +20,13 @@ async def create_product(
     product: ProductCreate,
     current_user: dict = Depends(get_current_active_user)
 ):
-    """Cria um novo produto (requer autenticação)"""
+    """Cria um novo produto"""
+    
+    # DEBUG: Ver dados recebidos
+    print(f"📦 Criando produto:")
+    print(f"   Nome: {product.name}")
+    print(f"   Preço: {product.price}")
+    print(f"   Estoque: {product.stock}")
     
     product_dict = {
         **product.dict(),
