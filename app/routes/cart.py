@@ -17,7 +17,7 @@ router = APIRouter(prefix="/cart", tags=["Carrinho"])
 def calculate_cart_total(items: List[dict]) -> tuple[int, float]:
     """Calcula total de itens e valor total do carrinho"""
     total_items = sum(item["quantity"] for item in items)
-    subtotal = sum(item["total_price"] for item in items)  # ← Mudança aqui: de "subtotal" para "total_price"
+    subtotal = sum(item["total_price"] for item in items) 
     return total_items, round(subtotal, 2)
 
 def get_product_details(product_id: str) -> dict:
@@ -48,11 +48,9 @@ def format_cart_items(items: List[dict]) -> List[dict]:
         if not product:
             continue
         
-        # Tratamento seguro para imagens
         image_urls = product.get("image_urls", [])
         product_image = image_urls[0] if image_urls and len(image_urls) > 0 else None
         
-        # Calcular valores
         unit_price = product["price"]
         quantity = item["quantity"]
         subtotal = round(unit_price * quantity, 2)
@@ -62,13 +60,13 @@ def format_cart_items(items: List[dict]) -> List[dict]:
             "product_id": str(product["_id"]),
             "product_name": product["name"],
             "product_image": product_image,
-            "product_price": unit_price,  # Campo que estava faltando
+            "product_price": unit_price, 
             "quantity": quantity,
             "unit_price": unit_price,
-            "subtotal": subtotal,  # Campo que estava faltando
+            "subtotal": subtotal, 
             "total_price": subtotal,
-            "in_stock": stock >= quantity,  # Campo que estava faltando
-            "available_stock": stock  # Campo que estava faltando
+            "in_stock": stock >= quantity, 
+            "available_stock": stock  
         })
     
     return formatted_items
@@ -187,7 +185,7 @@ async def update_cart_item(
                 "updated_at": datetime.utcnow()
             }
         }
-    )  # ← Este parêntese fecha o update_one
+    ) 
 
     if result.matched_count == 0:
         raise HTTPException(

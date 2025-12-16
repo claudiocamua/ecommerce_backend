@@ -4,7 +4,6 @@ from datetime import datetime
 from enum import Enum
 
 class OrderStatus(str, Enum):
-    """Status do pedido"""
     PENDING = "Pendente"
     CONFIRMED = "Confirmado"
     PROCESSING = "Em Processamento"
@@ -13,14 +12,12 @@ class OrderStatus(str, Enum):
     CANCELLED = "Cancelado"
 
 class PaymentMethod(str, Enum):
-    """Métodos de pagamento"""
     CREDIT_CARD = "Cartão de Crédito"
     DEBIT_CARD = "Cartão de Débito"
     PIX = "PIX"
     BOLETO = "Boleto Bancário"
 
 class ShippingAddress(BaseModel):
-    """Endereço de entrega"""
     street: str = Field(..., min_length=3, max_length=200)
     number: str = Field(..., max_length=10)
     complement: Optional[str] = Field(None, max_length=100)
@@ -31,17 +28,14 @@ class ShippingAddress(BaseModel):
     
     @validator('state')
     def validate_state(cls, v):
-        """Valida UF"""
         return v.upper()
     
     @validator('zip_code')
     def format_zip_code(cls, v):
-        """Formata CEP"""
         v = v.replace('-', '')
         return f"{v[:5]}-{v[5:]}"
 
 class OrderItem(BaseModel):
-    """Item do pedido"""
     product_id: str
     product_name: str
     product_price: float
@@ -49,7 +43,6 @@ class OrderItem(BaseModel):
     subtotal: float
 
 class CreateOrderRequest(BaseModel):
-    """Request para criar pedido"""
     payment_method: PaymentMethod
     shipping_address: ShippingAddress
     
@@ -70,7 +63,6 @@ class CreateOrderRequest(BaseModel):
         }
 
 class OrderResponse(BaseModel):
-    """Resposta do pedido"""
     id: str
     order_number: str
     user_id: str
@@ -123,19 +115,16 @@ class OrderResponse(BaseModel):
         }
 
 class UpdateOrderStatusRequest(BaseModel):
-    """Request para atualizar status do pedido"""
     status: OrderStatus
     tracking_code: Optional[str] = None
 
 class OrderListResponse(BaseModel):
-    """Lista de pedidos com paginação"""
     total: int
     page: int
     page_size: int
     orders: List[OrderResponse]
 
 class OrderStatsResponse(BaseModel):
-    """Estatísticas de pedidos do usuário"""
     total_orders: int
     total_spent: float
     pending_orders: int

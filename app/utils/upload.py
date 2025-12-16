@@ -12,7 +12,6 @@ ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
 MAX_FILE_SIZE = 5 * 1024 * 1024
 
 def validate_image(file: UploadFile) -> None:
-    """Valida se o arquivo é uma imagem válida"""
     
     file_ext = Path(file.filename).suffix.lower()
     if file_ext not in ALLOWED_EXTENSIONS:
@@ -28,7 +27,6 @@ def validate_image(file: UploadFile) -> None:
         )
 
 async def save_upload_file(file: UploadFile) -> str:
-    """Salva o arquivo e retorna a URL"""
     
     validate_image(file)
     
@@ -50,7 +48,6 @@ async def save_upload_file(file: UploadFile) -> str:
     return f"/uploads/products/{unique_filename}"
 
 async def save_multiple_files(files: List[UploadFile]) -> List[str]:
-    """Salva múltiplos arquivos"""
     
     if len(files) > 5:
         raise HTTPException(
@@ -66,7 +63,6 @@ async def save_multiple_files(files: List[UploadFile]) -> List[str]:
     return urls
 
 def delete_file(file_url: str) -> None:
-    """Delete um arquivo do servidor"""
     try:
         filename = Path(file_url).name
         file_path = UPLOAD_DIR / filename

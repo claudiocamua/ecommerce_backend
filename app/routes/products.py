@@ -20,10 +20,8 @@ async def create_product(
     product: ProductCreate,
     current_user: dict = Depends(get_current_active_user)
 ):
-    """Cria um novo produto"""
-    
-    # DEBUG: Ver dados recebidos
-    print(f"📦 Criando produto:")
+
+    print(f"  Criando produto:")
     print(f"   Nome: {product.name}")
     print(f"   Preço: {product.price}")
     print(f"   Estoque: {product.stock}")
@@ -50,7 +48,6 @@ async def upload_product_images(
     files: List[UploadFile] = File(...),
     current_user: dict = Depends(get_current_active_user)
 ):
-    """Faz upload de imagens para o produto"""
     
     if not ObjectId.is_valid(product_id):
         raise HTTPException(
@@ -97,7 +94,6 @@ async def list_products(
     max_price: Optional[float] = Query(None, ge=0, description="Preço máximo"),
     in_stock: Optional[bool] = Query(None, description="Apenas produtos em estoque")
 ):
-    """Lista produtos com filtros e paginação"""
     
     filters = {}
     
@@ -176,7 +172,6 @@ async def update_product(
     product_update: ProductUpdate,
     current_user: dict = Depends(get_current_active_user)
 ):
-    """Atualiza um produto (requer autenticação)"""
     
     if not ObjectId.is_valid(product_id):
         raise HTTPException(
@@ -221,7 +216,6 @@ async def delete_product(
     product_id: str,
     current_user: dict = Depends(get_current_active_user)
 ):
-    """Deleta um produto (requer autenticação)"""
     
     if not ObjectId.is_valid(product_id):
         raise HTTPException(
@@ -245,7 +239,6 @@ async def delete_product(
 
 @router.get("/categories/list")
 async def list_categories():
-    """Lista todas as categorias disponíveis"""
     return {
         "categories": [
             {"value": cat.value, "label": cat.value}

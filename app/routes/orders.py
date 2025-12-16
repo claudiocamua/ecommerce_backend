@@ -17,11 +17,9 @@ from app.utils.auth import get_current_active_user
 router = APIRouter(prefix="/orders", tags=["Pedidos"])
 
 def get_counters_collection():
-    """Retorna a collection de contadores"""
     return get_db()["counters"]
 
 def generate_order_number() -> str:
-    """Gera número único do pedido"""
     today = datetime.utcnow().strftime("%Y%m%d")
     
     counter = get_counters_collection().find_one_and_update(
@@ -35,7 +33,6 @@ def generate_order_number() -> str:
     return f"PED-{today}-{sequence:04d}"
 
 def calculate_shipping_fee(state: str) -> float:
-    """Calcula taxa de frete baseado no estado"""
     shipping_table = {
         "SP": 15.00,
         "RJ": 20.00,
@@ -48,7 +45,6 @@ def calculate_shipping_fee(state: str) -> float:
     return shipping_table.get(state, 50.00)  
 
 def estimate_delivery_date(state: str) -> datetime:
-    """Estima data de entrega baseado no estado"""
     delivery_days = {
         "SP": 3,
         "RJ": 5,
@@ -66,8 +62,6 @@ async def create_order(
     order_request: CreateOrderRequest,
     current_user: dict = Depends(get_current_active_user)
 ):
-    """Finaliza a compra criando um pedido a partir do carrinho"""
-    
     user_id = str(current_user["_id"])
     
     cart = carts_collection.find_one({"user_id": user_id})
@@ -158,8 +152,6 @@ async def list_my_orders(
     status: Optional[OrderStatus] = None,
     current_user: dict = Depends(get_current_active_user)
 ):
-    """Lista todos os pedidos do usuário logado"""
-    
     user_id = str(current_user["_id"])
     
     filters = {"user_id": user_id}
@@ -198,7 +190,6 @@ async def get_order(
     order_id: str,
     current_user: dict = Depends(get_current_active_user)
 ):
-    """Retorna detalhes de um pedido específico"""
     
     if not ObjectId.is_valid(order_id):
         raise HTTPException(
@@ -230,7 +221,6 @@ async def cancel_order(
     order_id: str,
     current_user: dict = Depends(get_current_active_user)
 ):
-    """Cancela um pedido (apenas se estiver pendente ou confirmado)"""
     
     if not ObjectId.is_valid(order_id):
         raise HTTPException(
@@ -283,7 +273,6 @@ async def cancel_order(
 
 @router.get("/stats/summary", response_model=OrderStatsResponse)
 async def get_order_stats(current_user: dict = Depends(get_current_active_user)):
-    """Retorna estatísticas dos pedidos do usuário"""
     
     user_id = str(current_user["_id"])
     
@@ -310,11 +299,6 @@ async def update_order_status(
     request: UpdateOrderStatusRequest,
     current_user: dict = Depends(get_current_active_user)
 ):
-    """
-    Atualiza o status do pedido (ADMIN)
-    
-    Para uso futuro com sistema de permissões de admin
-    """
     
     if not ObjectId.is_valid(order_id):
         raise HTTPException(

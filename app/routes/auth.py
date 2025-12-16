@@ -110,33 +110,29 @@ async def register(user: UserCreate):
 
 @router.post("/login", response_model=Token)
 async def login(form_data: OAuth2PasswordRequestForm = Depends()):
-    """Faz login e retorna token JWT"""
     
-    # DEBUG: Ver o que está chegando
-    print(f"🔍 Tentativa de login:")
+    print(f" Tentativa de login:")
     print(f"   Username: {form_data.username}")
     print(f"   Password length: {len(form_data.password)}")
 
     user = users_collection.find_one({"email": form_data.username.lower()})
     
-    # DEBUG: Verificar se usuário foi encontrado
     if not user:
-        print(f"❌ Usuário não encontrado: {form_data.username.lower()}")
+        print(f"Usuário não encontrado: {form_data.username.lower()}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Email ou senha incorretos",
             headers={"WWW-Authenticate": "Bearer"},
         )
     
-    print(f"✅ Usuário encontrado: {user['email']}")
+    print(f"Usuário encontrado: {user['email']}")
     print(f"   Hash armazenado: {user['hashed_password'][:20]}...")
     
-    # Verificar senha
     password_valid = verify_password(form_data.password, user["hashed_password"])
     print(f"   Senha válida: {password_valid}")
     
     if not password_valid:
-        print(f"❌ Senha incorreta para: {form_data.username}")
+        print(f"Senha incorreta para: {form_data.username}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Email ou senha incorretos",
@@ -160,7 +156,7 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
         {"$set": {"last_login": datetime.utcnow()}}
     )
 
-    print(f"✅ Login bem-sucedido: {user['email']}")
+    print(f"Login bem-sucedido: {user['email']}")
 
     return {
         "access_token": access_token,
@@ -232,7 +228,6 @@ async def change_password(
             detail="Senha atual incorreta"
         )
 
-    # Validar comprimento da nova senha
     if len(data.new_password.encode('utf-8')) > 72:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
