@@ -1,71 +1,112 @@
-from pydantic import BaseModel, EmailStr, Field, field_validator, model_validator
+from pydantic import BaseModel, EmailStr, Field, field_validator
 from typing import Optional
 from datetime import datetime
 import re
 
-class UserBase(BaseModel):
+
+class UserCreate(BaseModel):
     email: EmailStr
+    password: str = Field(..., min_length=8, max_length=30, description="Senha entre 8 e 30 caracteres")
+    password_confirm: str = Field(..., min_length=8, max_length=30)
     full_name: str = Field(..., min_length=3, max_length=100)
-
-
-class UserCreate(UserBase):
-    password: str = Field(..., min_length=8, max_length=72)
-    password_confirm: str = Field(..., min_length=8, max_length=72)
 
     @field_validator('password')
     @classmethod
-    def validate_password(cls, v: str) -> str:
-        """Regras fortes de senha"""
-        # Verificar tamanho em bytes (limite do bcrypt)
-        if len(v.encode('utf-8')) > 72:
-            raise ValueError("Senha não pode ter mais de 72 caracteres")
-        
+    def validate_password(cls, v):
         if len(v) < 8:
-            raise ValueError("Senha deve ter no mínimo 8 caracteres")
-        if not re.search(r"[A-Z]", v):
-            raise ValueError("Senha deve conter pelo menos 1 letra maiúscula")
-        if not re.search(r"[a-z]", v):
-            raise ValueError("Senha deve conter pelo menos 1 letra minúscula")
-        if not re.search(r"[0-9]", v):
-            raise ValueError("Senha deve conter pelo menos 1 número")
-        if not re.search(r"[!@#$%^&*(),.?\":{}|<>]", v):
-            raise ValueError("Senha deve conter pelo menos 1 caractere especial")
+            raise ValueError('A senha deve ter no mínimo 8 caracteres')
+        
+        if len(v) > 30:
+            raise ValueError('A senha deve ter no máximo 30 caracteres')
+        
+        if not re.search(r'[A-Z]', v):
+            raise ValueError('A senha deve conter pelo menos uma letra maiúscula')
+        
+        if not re.search(r'[a-z]', v):
+            raise ValueError('A senha deve conter pelo menos uma letra minúscula')
+        
+        if not re.search(r'\d', v):
+            raise ValueError('A senha deve conter pelo menos um número')
+        
+        if not re.search(r'[!@#$%^&*(),.?":{}|<>]', v):
+            raise ValueError('A senha deve conter pelo menos um caractere especial')
+        
         return v
 
-    @model_validator(mode='after')
-    def passwords_match(self):
-        if self.password != self.password_confirm:
-            raise ValueError("As senhas não conferem")
-        return self
+    @field_validator('password_confirm')
+    @classmethod
+    def passwords_match(cls, v, info):
+        if 'password' in info.data and v != info.data['password']:
+            raise ValueError('As senhas não coincidem')
+        return v
+
 
 class UserLogin(BaseModel):
     email: EmailStr
     password: str
 
-class UserResponse(UserBase):
-    id: str
+
+class UserResponse(BaseModel):
+    id: str = Field(alias="_id")
+    email: EmailStr
+    full_name: str
     is_active: bool = True
     is_verified: bool = False
     created_at: datetime
 
     class Config:
-        from_attributes = True
-        json_schema_extra = {
-            "example": {
-                "id": "507f1f77bcf86cd799439011",
-                "email": "usuario@example.com",
-                "full_name": "João Silva",
-                "is_active": True,
-                "is_verified": False,
-                "created_at": "2024-12-01T10:00:00"
-            }
-        }
+        populate_by_name = True
+
 
 class Token(BaseModel):
     access_token: str
     token_type: str = "bearer"
-    user: UserResponse
+    user: Optional[UserResponse] = None
 
 
 class TokenData(BaseModel):
     email: Optional[str] = None
+
+
+class UserUpdate(BaseModel):
+    full_name: Optional[str] = Field(None, min_length=3, max_length=100)
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str = Field(..., min_length=8, max_length=30)
+    new_password_confirm: str = Field(..., min_length=8, max_length=30)
+
+    @field_validator('new_password')
+    @classmethod
+    def validate_new_password(cls, v):
+        if len(v) < 8:
+            raise ValueError('A senha deve ter no mínimo 8 caracteres')
+        
+        if len(v) > 30:
+            raise ValueError('A senha deve ter no máximo 30 caracteres')
+        
+        if not re.search(r'[A-Z]', v):
+            raise ValueError('A senha deve conter pelo menos uma letra maiúscula')
+        
+        if not re.search(r'[a-z]', v):
+            raise ValueError('A senha deve conter pelo menos uma letra minúscula')
+        
+        if not re.search(r'\d', v):
+            raise ValueError('A senha deve conter pelo menos um número')
+        
+        if not re.search(r'[!@#$%^&*(),.?":{}|<>]', v):
+            raise ValueError('A senha deve conter pelo menos um caractere especial')
+        
+        return v
+
+    @field_validator('new_password_confirm')
+    @classmethod
+    def passwords_match(cls, v, info):
+        if 'new_password' in info.data and v != info.data['new_password']:
+            raise ValueError('As senhas não coincidem')
+        return v
+
+
+class ChangePasswordResponse(BaseModel):
+    message: str
