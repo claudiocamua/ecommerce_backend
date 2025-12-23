@@ -1,3 +1,4 @@
+import json
 import traceback
 from fastapi import APIRouter, HTTPException, status, Depends
 from fastapi.security import OAuth2PasswordRequestForm
@@ -17,7 +18,7 @@ from app.config import settings
 from app.utils.google_oauth import oauth
 from starlette.requests import Request
 from starlette.responses import RedirectResponse
-import httpx
+import urllib.parse
 
 router = APIRouter(prefix="/auth", tags=["Autenticação"])
 
@@ -36,32 +37,28 @@ async def register(user: UserCreate):
     """Registra um novo usuário"""
     
     try:
-        # Verificar se email já existe
         if users_collection.find_one({"email": user.email.lower()}):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Este email já está cadastrado"
             )
 
-        # Validar comprimento da senha em bytes (bcrypt tem limite de 72 bytes)
         if len(user.password.encode('utf-8')) > 72:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="A senha não pode ter mais de 72 caracteres"
             )
 
-        # Gerar hash da senha
         try:
             hashed_password = get_password_hash(user.password)
         except Exception as e:
-            print(f"❌ Erro ao fazer hash da senha: {e}")
+            print(f"Erro ao fazer hash da senha: {e}")
             traceback.print_exc()
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Erro ao processar senha. Tente uma senha mais curta."
             )
 
-        # Criar documento do usuário
         user_dict = {
             "email": user.email.lower(),
             "full_name": user.full_name,
@@ -72,7 +69,6 @@ async def register(user: UserCreate):
             "updated_at": datetime.utcnow()
         }
 
-        # Inserir no banco
         try:
             result = users_collection.insert_one(user_dict)
             created_user = users_collection.find_one({"_id": result.inserted_id})
@@ -84,14 +80,13 @@ async def register(user: UserCreate):
                 )
                 
         except Exception as e:
-            print(f"❌ Erro ao inserir no MongoDB: {e}")
+            print(f"Erro ao inserir no MongoDB: {e}")
             traceback.print_exc()
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f"Erro ao salvar usuário no banco de dados"
             )
 
-        # Retornar usuário criado
         return {
             "id": str(created_user["_id"]),
             "email": created_user["email"],
@@ -104,7 +99,7 @@ async def register(user: UserCreate):
     except HTTPException:
         raise
     except Exception as e:
-        print(f"❌ Erro inesperado no registro: {e}")
+        print(f"Erro inesperado no registro: {e}")
         traceback.print_exc()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -261,7 +256,7 @@ async def google_login(request: Request):
     return await oauth.google.authorize_redirect(request, redirect_uri)
 
 
-@router.get("/google/callback", response_model=Token)
+@router.get("/google/callback")
 async def google_callback(request: Request):
     """
     Callback do Google OAuth2
@@ -272,7 +267,10 @@ async def google_callback(request: Request):
         
         user_info = token.get('userinfo')
         if not user_info:
-            raise HTTPException(status_code=400, detail="Não foi possível obter informações do usuário")
+    
+            frontend_url = settings.ALLOWED_ORIGINS.split(',')[0]  
+            error_url = f"{frontend_url}/auth/callback?error=Não foi possível obter informações do usuário"
+            return RedirectResponse(url=error_url)
         
         email = user_info.get('email')
         full_name = user_info.get('name')
@@ -280,7 +278,9 @@ async def google_callback(request: Request):
         picture = user_info.get('picture')
         
         if not email:
-            raise HTTPException(status_code=400, detail="Email não fornecido pelo Google")
+            frontend_url = settings.ALLOWED_ORIGINS.split(',')[0]
+            error_url = f"{frontend_url}/auth/callback?error=Email não fornecido pelo Google"
+            return RedirectResponse(url=error_url)
         
         existing_user = users_collection.find_one({"email": email})
         
@@ -293,7 +293,7 @@ async def google_callback(request: Request):
                             "oauth_provider": "google",
                             "oauth_id": google_id,
                             "picture": picture,
-                            "is_verified": True  
+                            "is_verified": True
                         }
                     }
                 )
@@ -307,9 +307,9 @@ async def google_callback(request: Request):
                 "oauth_id": google_id,
                 "picture": picture,
                 "is_active": True,
-                "is_verified": True,  
+                "is_verified": True,
                 "created_at": datetime.utcnow(),
-                "hashed_password": None  
+                "hashed_password": None
             }
             
             result = users_collection.insert_one(new_user)
@@ -321,24 +321,27 @@ async def google_callback(request: Request):
             expires_delta=access_token_expires
         )
         
-        user_response = UserResponse(
-            _id=str(user_data["_id"]),
-            email=user_data["email"],
-            full_name=user_data["full_name"],
-            is_active=user_data.get("is_active", True),
-            is_verified=user_data.get("is_verified", True),
-            created_at=user_data["created_at"],
-            oauth_provider=user_data.get("oauth_provider"),
-            oauth_id=user_data.get("oauth_id"),
-            picture=user_data.get("picture")
-        )
+        user_response = {
+            "_id": str(user_data["_id"]),
+            "email": user_data["email"],
+            "full_name": user_data["full_name"],
+            "is_active": user_data.get("is_active", True),
+            "is_verified": user_data.get("is_verified", True),
+            "created_at": user_data["created_at"].isoformat(),
+            "oauth_provider": user_data.get("oauth_provider"),
+            "oauth_id": user_data.get("oauth_id"),
+            "picture": user_data.get("picture")
+        }
         
-        return Token(
-            access_token=access_token,
-            token_type="bearer",
-            user=user_response
-        )
+        user_json = urllib.parse.quote(json.dumps(user_response))
+        
+        frontend_url = settings.ALLOWED_ORIGINS.split(',')[0]
+        callback_url = f"{frontend_url}/auth/callback?access_token={access_token}&user={user_json}"
+        
+        return RedirectResponse(url=callback_url)
         
     except Exception as e:
         print(f"Erro no Google OAuth callback: {str(e)}")
-        raise HTTPException(status_code=400, detail=f"Erro na autenticação com Google: {str(e)}")
+        frontend_url = settings.ALLOWED_ORIGINS.split(',')[0]
+        error_url = f"{frontend_url}/auth/callback?error={urllib.parse.quote(str(e))}"
+        return RedirectResponse(url=error_url)
