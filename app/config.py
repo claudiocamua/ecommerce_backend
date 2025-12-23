@@ -1,32 +1,51 @@
-import os
+from pydantic_settings import BaseSettings
+from typing import List, ClassVar
 from dotenv import load_dotenv
 
 load_dotenv()
 
-class Settings:
+class Settings(BaseSettings):
     """Configurações gerais da aplicação"""
 
-    APP_NAME = "E-commerce API"
-    VERSION = "4.0.0"
+    APP_NAME: ClassVar[str] = "E-commerce API"
+    VERSION: ClassVar[str] = "1.0.0"
     
-    ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
-    DEMO_MODE = os.getenv("DEMO_MODE", "false").lower() == "true"
-    DEBUG = ENVIRONMENT != "production"
+    MONGODB_URI: str
+    DB_NAME: str = "ecommerce"
 
-    MONGODB_URI = os.getenv("MONGODB_URI")
-    DB_NAME = os.getenv("DB_NAME", "ecommerce")
-
-    SECRET_KEY = os.getenv("SECRET_KEY")
-    ALGORITHM = os.getenv("ALGORITHM", "HS256")
-    ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", 30))
-
-    ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000")
-
-    UPLOAD_DIR = os.getenv("UPLOAD_DIR", "uploads")
-    MAX_UPLOAD_SIZE = int(os.getenv("MAX_UPLOAD_SIZE", 5242880))
-
-    def get_allowed_origins(self):
-        """Retorna lista de URLs separadas por vírgula"""
+    SECRET_KEY: str
+    ALGORITHM: str = "HS256"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+    
+    ENVIRONMENT: str = "development"
+    DEMO_MODE: bool = False
+    
+    ALLOWED_ORIGINS: str = "http://localhost:3000"
+    
+    UPLOAD_DIR: str = "uploads"
+    MAX_UPLOAD_SIZE: int = 5242880  
+    
+    GOOGLE_CLIENT_ID: str = ""
+    GOOGLE_CLIENT_SECRET: str = ""
+    GOOGLE_REDIRECT_URI: str = ""
+    
+    def get_allowed_origins(self) -> List[str]:
         return [origin.strip() for origin in self.ALLOWED_ORIGINS.split(",")]
+    
+    def get_google_redirect_uri(self) -> str:
+        """
+        Retorna a URI de redirect correta baseada no ambiente
+        """
+        if self.GOOGLE_REDIRECT_URI:
+            return self.GOOGLE_REDIRECT_URI
+        
+        if self.ENVIRONMENT == "production":
+            return "https://ecommerce-backend-qm1k.onrender.com/auth/google/callback"
+        else:
+            return "http://localhost:8000/auth/google/callback"
+    
+    class Config:
+        env_file = ".env"
+        case_sensitive = True
 
 settings = Settings()

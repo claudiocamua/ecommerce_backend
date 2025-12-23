@@ -14,6 +14,10 @@ from app.utils.auth import (
     get_current_active_user
 )
 from app.config import settings
+from app.utils.google_oauth import oauth
+from starlette.requests import Request
+from starlette.responses import RedirectResponse
+import httpx
 
 router = APIRouter(prefix="/auth", tags=["Autenticação"])
 
@@ -245,3 +249,96 @@ async def change_password(
     )
 
     return {"message": "Senha alterada com sucesso"}
+
+
+@router.get("/google/login")
+async def google_login(request: Request):
+    """
+    Inicia o fluxo de autenticação com Google
+    Redireciona o usuário para a página de login do Google
+    """
+    redirect_uri = request.url_for('google_callback')
+    return await oauth.google.authorize_redirect(request, redirect_uri)
+
+
+@router.get("/google/callback", response_model=Token)
+async def google_callback(request: Request):
+    """
+    Callback do Google OAuth2
+    Recebe o código de autorização e troca por token de acesso
+    """
+    try:
+        token = await oauth.google.authorize_access_token(request)
+        
+        user_info = token.get('userinfo')
+        if not user_info:
+            raise HTTPException(status_code=400, detail="Não foi possível obter informações do usuário")
+        
+        email = user_info.get('email')
+        full_name = user_info.get('name')
+        google_id = user_info.get('sub')
+        picture = user_info.get('picture')
+        
+        if not email:
+            raise HTTPException(status_code=400, detail="Email não fornecido pelo Google")
+        
+        existing_user = users_collection.find_one({"email": email})
+        
+        if existing_user:
+            if not existing_user.get('oauth_provider'):
+                users_collection.update_one(
+                    {"email": email},
+                    {
+                        "$set": {
+                            "oauth_provider": "google",
+                            "oauth_id": google_id,
+                            "picture": picture,
+                            "is_verified": True  
+                        }
+                    }
+                )
+            
+            user_data = existing_user
+        else:
+            new_user = {
+                "email": email,
+                "full_name": full_name,
+                "oauth_provider": "google",
+                "oauth_id": google_id,
+                "picture": picture,
+                "is_active": True,
+                "is_verified": True,  
+                "created_at": datetime.utcnow(),
+                "hashed_password": None  
+            }
+            
+            result = users_collection.insert_one(new_user)
+            user_data = users_collection.find_one({"_id": result.inserted_id})
+        
+        access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+        access_token = create_access_token(
+            data={"sub": email},
+            expires_delta=access_token_expires
+        )
+        
+        user_response = UserResponse(
+            _id=str(user_data["_id"]),
+            email=user_data["email"],
+            full_name=user_data["full_name"],
+            is_active=user_data.get("is_active", True),
+            is_verified=user_data.get("is_verified", True),
+            created_at=user_data["created_at"],
+            oauth_provider=user_data.get("oauth_provider"),
+            oauth_id=user_data.get("oauth_id"),
+            picture=user_data.get("picture")
+        )
+        
+        return Token(
+            access_token=access_token,
+            token_type="bearer",
+            user=user_response
+        )
+        
+    except Exception as e:
+        print(f"Erro no Google OAuth callback: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Erro na autenticação com Google: {str(e)}")

@@ -54,6 +54,10 @@ class UserResponse(BaseModel):
     is_verified: bool = False
     created_at: datetime
 
+    oauth_provider: Optional[str] = None 
+    oauth_id: Optional[str] = None  
+    picture: Optional[str] = None 
+
     class Config:
         populate_by_name = True
 
@@ -110,3 +114,8 @@ class ChangePasswordRequest(BaseModel):
 
 class ChangePasswordResponse(BaseModel):
     message: str
+
+
+class GoogleCallbackResponse(BaseModel):
+    token: Token
+    is_new_user: bool = False
